@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sparschwein">
+<title>Sparschwein</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF1EE; --ink:#1E2925; --muted:#5E6B66; --line:#CCD6D1;
+  --accent:#2D6B5A; --accent-ink:#fff; --tray:#E2E8E4; --err:#B5473A; --glass:#93AEB9; --glass-fill:rgba(147,174,185,.12);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111916; --ink:#E6EEE9; --muted:#93A39C; --line:#2A3631;
+    --accent:#73C3A8; --accent-ink:#0D1714; --tray:#1A2420; --err:#F09A8C; --glass:#7D9CA8; --glass-fill:rgba(125,156,168,.10);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111916; --ink:#E6EEE9; --muted:#93A39C; --line:#2A3631;
+  --accent:#73C3A8; --accent-ink:#0D1714; --tray:#1A2420; --err:#F09A8C; --glass:#7D9CA8; --glass-fill:rgba(125,156,168,.10);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{margin:0; height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Bricolage Grotesque", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+}
+main{max-width:480px; margin:0 auto; padding:12px 16px 14px; min-height:100%; display:flex; flex-direction:column}
+.total{text-align:center}
+.total .amount{
+  font-weight:800; font-size:clamp(2.2rem, 11vw, 3.2rem); line-height:1; letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums; font-variation-settings:"opsz" 96; display:inline-block;
+}
+.total .sub{margin-top:6px; color:var(--muted); font-size:1rem}
+.total .sub b{color:var(--ink); font-weight:600; font-variant-numeric:tabular-nums}
+
+/* Reiter */
+.tabs{display:flex; gap:4px; background:var(--tray); border-radius:999px; padding:4px; width:max-content; margin:0 auto 12px}
+.tab{padding:8px 20px; border-radius:999px; font-weight:600; color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--accent); color:var(--accent-ink)}
+.view[hidden]{display:none !important}
+#glassWrap{flex:1 1 0; min-height:150px; position:relative; margin:8px 0}
+#glass{position:absolute; inset:0; display:block; width:100%; height:100%; touch-action:manipulation}
+/* Geldstapel */
+.stage{flex:1 1 0; min-height:150px; position:relative; overflow:hidden; margin:8px 0}
+.stageInner{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); display:flex; flex-direction:column; gap:18px}
+.piles{display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:8px 6px; max-width:100%}
+.group{display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:14px 16px}
+.group:empty{display:none}
+.stack{display:flex; flex-direction:column; align-items:center; gap:6px; max-width:100%}
+.pile{position:relative}
+.pile > svg{position:absolute; left:0; top:0; display:block;
+  /* Dunkle Kante oben plus Schatten nach unten, damit jedes Stück im Stapel einzeln erkennbar ist */
+  filter:drop-shadow(0 -1.6px 0 rgba(0,0,0,.62)) drop-shadow(0 2px 1.5px rgba(0,0,0,.4))}
+.count{font-size:.85rem; color:var(--muted); font-variant-numeric:tabular-nums}
+.empty{text-align:center; color:var(--muted); font-size:1rem}
+
+.tray{background:var(--tray); border-radius:24px; padding:12px 12px 10px}
+.tray h2{font-size:.85rem; font-weight:600; margin:0 4px 8px; color:var(--muted)}
+.coins{display:grid; grid-template-columns:repeat(4,1fr); gap:6px 6px; justify-items:center; align-items:center}
+.notes{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:10px}
+.notes .money{width:calc((100% - 32px)/5)}
+button{font:inherit; color:inherit; cursor:pointer; border:0; background:none; padding:0}
+button:focus-visible, input:focus-visible{outline:3px solid var(--accent); outline-offset:3px; border-radius:8px}
+.money{transition:transform .12s ease; display:block}
+.money svg{display:block; width:100%; height:auto; filter:drop-shadow(0 2px 1.5px rgba(0,0,0,.25))}
+.money:active{transform:scale(.9)}
+.row{display:flex; gap:8px; margin-top:10px; align-items:stretch}
+.row input{
+  flex:1; min-width:0; font:inherit; font-size:1rem; padding:10px 12px; border-radius:12px;
+  border:1.5px solid var(--line); background:var(--bg); color:var(--ink); font-variant-numeric:tabular-nums;
+}
+.btn{border-radius:12px; padding:10px 14px; font-weight:600; white-space:nowrap}
+.btn.primary{background:var(--accent); color:var(--accent-ink)}
+.btn.ghost{border:1.5px solid var(--line)}
+.btn:disabled{opacity:.4; cursor:default}
+.foot{display:flex; flex-direction:column; align-items:stretch; margin-top:10px; gap:6px}
+.status{color:var(--muted); font-size:.78rem; text-align:center; order:2}
+.footBtns{display:flex; gap:8px}
+.footBtns .btn{flex:1}
+.btn.danger{background:var(--err); border-color:var(--err); color:var(--bg)}
+.msg{color:var(--err); font-size:.85rem; margin:6px 4px 0}
+.msg:empty{display:none}
+[hidden]{display:none !important}
+/* Zinsrechner */
+.calc{display:flex; flex-direction:column; gap:18px; margin-top:4px}
+.cin{display:grid; grid-template-columns:1.6fr 1fr; gap:10px}
+.cfield{display:flex; flex-direction:column; gap:6px; min-width:0}
+.cfield label{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-left:4px}
+.cbox{display:flex; align-items:baseline; gap:6px; background:var(--tray); border:1.5px solid transparent; border-radius:14px; padding:12px 14px; transition:border-color .15s}
+.cbox:focus-within{border-color:var(--accent)}
+.cbox input{flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--ink); font:inherit; font-size:1.3rem; font-weight:600; font-variant-numeric:tabular-nums; padding:0}
+.cbox input:focus-visible{outline:none}
+.cbox span{color:var(--muted); font-weight:600}
+.cres{background:var(--tray); border-radius:26px; overflow:hidden}
+.crow{display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:16px 20px}
+.crow + .crow{border-top:1.5px solid var(--bg)}
+.crow .l{color:var(--muted)}
+.crow .v{font-variant-numeric:tabular-nums; font-weight:600; font-size:1.3rem; white-space:nowrap}
+.crow.main{flex-direction:column; align-items:flex-start; gap:4px; padding:22px 20px}
+.crow.main .l{color:var(--ink); font-weight:600}
+.crow.main .v{font-weight:800; font-size:clamp(2.2rem, 10vw, 2.9rem); letter-spacing:-.03em; line-height:1; color:var(--accent); white-space:normal; overflow-wrap:anywhere}
+.fine{font-size:.68em; color:var(--muted); opacity:.8}
+.cnote{margin:0 4px; font-size:.8rem; line-height:1.5; color:var(--muted)}
+@media (max-width:360px){ .cin{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<main>
+  <nav class="tabs" role="tablist" aria-label="Ansicht">
+    <button class="tab" role="tab" id="tab-stapel" aria-controls="stage" aria-selected="true">Stapel</button>
+    <button class="tab" role="tab" id="tab-glas" aria-controls="glassWrap" aria-selected="false">Glas</button>
+    <button class="tab" role="tab" id="tab-zinsen" aria-controls="calc" aria-selected="false">Zinsen</button>
+  </nav>
+  <section class="total" id="totalSec" aria-live="polite">
+    <div class="amount" id="total">0,00 €</div>
+    <div class="sub">Heute eingezahlt: <b id="today">0,00 €</b></div>
+  </section>
+
+  <div class="view" id="glassWrap" hidden><canvas id="glass" aria-label="Glas mit deinem gesparten Geld"></canvas></div>
+
+  <section class="stage view" id="stage" aria-label="Dein gespartes Geld">
+    <div class="stageInner" id="stageInner">
+      <div class="group" id="noteStacks"></div>
+      <div class="group" id="coinStacks"></div>
+      <div class="empty" id="empty">Noch nichts gespart. Tippe unten auf Geld.</div>
+    </div>
+  </section>
+
+  <section class="calc view" id="calc" hidden>
+    <div class="cin">
+      <div class="cfield">
+        <label for="cAmount">Betrag</label>
+        <div class="cbox"><input id="cAmount" type="text" inputmode="decimal" autocomplete="off"><span>€</span></div>
+      </div>
+      <div class="cfield">
+        <label for="cRate">Zinssatz</label>
+        <div class="cbox"><input id="cRate" type="text" inputmode="decimal" autocomplete="off"><span>%</span></div>
+      </div>
+    </div>
+    <div class="cres" aria-live="polite">
+      <div class="crow main"><span class="l">Pro Jahr</span><span class="v" id="cYear">0,00 €</span></div>
+      <div class="crow"><span class="l">Pro Monat</span><span class="v" id="cMonth">0,00 €</span></div>
+      <div class="crow"><span class="l">Pro Tag</span><span class="v" id="cDay">0,00<span class="fine">00</span> €</span></div>
+    </div>
+    <p class="cnote">Einfache Jahreszinsen ohne Zinseszins und Steuern. Monat = Jahr ÷ 12, Tag = Jahr ÷ 365.</p>
+  </section>
+
+  <section class="tray" id="traySec">
+    <h2>Tippe, was du heute zur Seite legst</h2>
+    <div class="coins" id="coins"></div>
+    <div class="notes" id="notes"></div>
+    <div class="row">
+      <input id="amount" inputmode="text" autocomplete="off" placeholder="z. B. 3,70 oder 1 € in 1 ct" aria-label="Betrag in Euro, optional mit Stückelung">
+      <button class="btn primary" id="drop">Hinzufügen</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <div class="foot" id="footSec">
+    <span class="status" id="status">Lädt …</span>
+    <div class="footBtns">
+      <button class="btn ghost" id="undo" disabled title="Letzte Einzahlung von heute zurücknehmen">Rückgängig</button>
+      <button class="btn ghost" id="clear" disabled>Alles löschen</button>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  // ---------- Stückelung (Cent, Größen in mm) ----------
+  const DENOMS = {
+    "100e":{v:10000, t:"note", w:147, h:77},
+    "50e": {v:5000,  t:"note", w:140, h:77},
+    "20e": {v:2000,  t:"note", w:133, h:72},
+    "10e": {v:1000,  t:"note", w:127, h:67},
+    "5e":  {v:500,   t:"note", w:120, h:62},
+    "2e":  {v:200,   t:"coin", d:25.75, m:"bi2"},
+    "1e":  {v:100,   t:"coin", d:23.25, m:"bi1"},
+    "50c": {v:50,    t:"coin", d:24.25, m:"au"},
+    "20c": {v:20,    t:"coin", d:22.25, m:"au"},
+    "10c": {v:10,    t:"coin", d:19.75, m:"au"},
+    "5c":  {v:5,     t:"coin", d:21.25, m:"cu"},
+    "2c":  {v:2,     t:"coin", d:18.75, m:"cu"},
+    "1c":  {v:1,     t:"coin", d:16.25, m:"cu"},
+  };
+  const KEYS = Object.keys(DENOMS); // absteigend
+  const label = k => { const v = DENOMS[k].v; return v >= 100 ? (v/100)+" €" : v+" ct"; };
+  const fmt = new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR"});
+  const euro = c => fmt.format(c/100);
+  const dayKey = (d=new Date()) => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- Grafiken (eigener Stil, keine Originalmotive) ----------
+  const NOTE_COL = {
+    "5e":  {main:"#7E8A86", deep:"#4E5956", wash:"#C9D3CB"},
+    "10e": {main:"#C4453C", deep:"#7E241E", wash:"#F0B4A8"},
+    "20e": {main:"#3A68AD", deep:"#1F3F73", wash:"#AFC6E8"},
+    "50e": {main:"#E07E2A", deep:"#8E4512", wash:"#F6C995"},
+    "100e":{main:"#3B8D5A", deep:"#1D5233", wash:"#AEDAB9"},
+  };
+  function noteSVG(k){
+    const c = NOTE_COL[k], n = DENOMS[k].v/100, id = "__ID__n"+k;
+    let rings = "";
+    for (let i=0;i<9;i++) rings += `<ellipse cx="86" cy="37" rx="${10+i*4.2}" ry="${7+i*3.1}" fill="none" stroke="${c.main}" stroke-opacity="${.32-i*.025}" stroke-width=".6"/>`;
+    let lines = "";
+    for (let i=0;i<14;i++) lines += `<path d="M${-10+i*11} 74 Q ${20+i*11} 30 ${60+i*11} 0" fill="none" stroke="${c.main}" stroke-opacity=".10" stroke-width=".5"/>`;
+    return `<svg viewBox="0 0 140 74" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="${id}g" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="${c.wash}" stop-opacity=".35"/>
+          <stop offset=".45" stop-color="${c.wash}" stop-opacity=".75"/>
+          <stop offset="1" stop-color="${c.main}" stop-opacity=".95"/>
+        </linearGradient>
+        <linearGradient id="${id}h" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#E9EEF2"/><stop offset=".3" stop-color="#C7D9E8"/>
+          <stop offset=".55" stop-color="#E8D9F0"/><stop offset=".8" stop-color="#D6E8D5"/><stop offset="1" stop-color="#EEF1F3"/>
+        </linearGradient>
+        <clipPath id="${id}c"><rect width="140" height="74" rx="3"/></clipPath>
+      </defs>
+      <g clip-path="url(#${id}c)">
+        <rect width="140" height="74" fill="#F5F0E3"/>
+        <rect width="140" height="74" fill="url(#${id}g)"/>
+        ${lines}${rings}
+        <rect x="0" y="0" width="140" height="5" fill="${c.main}" opacity=".55"/>
+        <rect x="112" y="0" width="9" height="74" fill="url(#${id}h)" opacity=".95"/>
+        <rect x="112" y="0" width="9" height="74" fill="none" stroke="#fff" stroke-opacity=".6" stroke-width=".6"/>
+        <circle cx="30" cy="40" r="13" fill="#fff" opacity=".35"/>
+      </g>
+      <text x="8" y="26" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="800" font-size="21" fill="${c.deep}">${n}</text>
+      <text x="8" y="66" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="800" font-size="12" fill="${c.deep}">${n}</text>
+      <text x="${11 + String(n).length*7.2}" y="65.5" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="600" font-size="6.5" letter-spacing="1.2" fill="${c.deep}" opacity=".8">EURO</text>
+      <text x="134" y="68" text-anchor="end" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="800" font-size="9" fill="#fff" opacity=".9">${n}</text>
+      <rect x=".4" y=".4" width="139.2" height="73.2" rx="3" fill="none" stroke="#000" stroke-opacity=".14" stroke-width=".8"/>
+    </svg>`;
+  }
+  const METAL = {
+    cu:{hi:"#F6C7A3", mid:"#C8713F", lo:"#8C4823", ink:"#5A2A10"},
+    au:{hi:"#FDEBB5", mid:"#D4A845", lo:"#9C7826", ink:"#5E4512"},
+    ag:{hi:"#F7F9FA", mid:"#BFC5C9", lo:"#80878C", ink:"#3E4448"},
+  };
+  function metalGrad(id, m){
+    return `<radialGradient id="${id}" cx=".36" cy=".32" r=".75">
+      <stop offset="0" stop-color="${m.hi}"/><stop offset=".62" stop-color="${m.mid}"/><stop offset="1" stop-color="${m.lo}"/></radialGradient>`;
+  }
+  function coinSVG(k){
+    const d = DENOMS[k], id = "__ID__c"+k, euroCoin = d.v >= 100;
+    const outer = d.m==="cu" ? METAL.cu : d.m==="au" ? METAL.au : d.m==="bi1" ? METAL.ag : METAL.au;
+    const inner = d.m==="bi1" ? METAL.au : d.m==="bi2" ? METAL.ag : null;
+    const ink = (inner || outer).ink;
+    const num = euroCoin ? d.v/100 : d.v;
+    let stars = "";
+    for (let i=0;i<12;i++){ const a = i/12*Math.PI*2; stars += `<circle cx="${50+Math.cos(a)*37}" cy="${50+Math.sin(a)*37}" r="1.6" fill="${outer.ink}" opacity=".45"/>`; }
+    return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>${metalGrad(id+"o", outer)}${inner ? metalGrad(id+"i", inner) : ""}</defs>
+      <circle cx="50" cy="50" r="49" fill="${outer.lo}"/>
+      <circle cx="50" cy="50" r="47.5" fill="url(#${id}o)"/>
+      <circle cx="50" cy="50" r="46.6" fill="none" stroke="${outer.lo}" stroke-width="2" stroke-dasharray="1.1 1.5" opacity=".7"/>
+      <circle cx="50" cy="50" r="42" fill="none" stroke="${outer.lo}" stroke-width="1.2" opacity=".55"/>
+      ${inner ? `<circle cx="50" cy="50" r="31" fill="url(#${id}i)"/><circle cx="50" cy="50" r="31" fill="none" stroke="${inner.lo}" stroke-width="1.2" opacity=".7"/>` : stars}
+      <text x="50" y="${euroCoin?57:56}" text-anchor="middle" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="800" font-size="${euroCoin?36:num>=10?32:36}" fill="${ink}" opacity=".85">${num}</text>
+      <text x="50" y="${euroCoin?72:73}" text-anchor="middle" font-family="Bricolage Grotesque, system-ui, sans-serif" font-weight="600" font-size="8.5" letter-spacing="1.4" fill="${ink}" opacity=".75">${euroCoin?"EURO":"CENT"}</text>
+      <ellipse cx="34" cy="28" rx="16" ry="8" transform="rotate(-35 34 28)" fill="#fff" opacity=".22"/>
+    </svg>`;
+  }
+  const ART = {}; for (const k of KEYS) ART[k] = DENOMS[k].t==="note" ? noteSVG(k) : coinSVG(k);
+  let uid = 0; const art = k => ART[k].split("__ID__").join("u"+(++uid));
+
+  // ---------- Daten ----------
+  let state = {v:1, u:0, days:{}};
+  const LS = "sparschwein:v1";
+  function lsLoad(){ try{ const s = localStorage.getItem(LS); return s ? JSON.parse(s) : null; }catch(e){ return null; } }
+  function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify(state)); }catch(e){} }
+  const valid = s => s && typeof s==="object" && s.days && typeof s.days==="object";
+  const allItems = () => Object.values(state.days).flat().filter(k => DENOMS[k]);
+  const totalCents = () => allItems().reduce((a,k)=>a+DENOMS[k].v,0);
+  const todayList = () => state.days[dayKey()] || [];
+  const todayCents = () => todayList().reduce((a,k)=>a+(DENOMS[k]?DENOMS[k].v:0),0);
+
+  // ---------- Anzeige ----------
+  const $ = id => document.getElementById(id);
+  const elTotal=$("total"), elToday=$("today"), elStatus=$("status"), elUndo=$("undo"), elMsg=$("msg");
+  const noteStacks=$("noteStacks"), coinStacks=$("coinStacks"), elEmpty=$("empty");
+  function renderNumbers(){
+    elTotal.textContent = euro(totalCents());
+    elToday.textContent = euro(todayCents());
+    elUndo.disabled = todayList().length === 0;
+    $("clear").disabled = allItems().length === 0;
+  }
+
+  const MAX_VIS = 10;
+  function geometry(k){
+    const d = DENOMS[k];
+    if (d.t==="note"){ const w = Math.round(d.w*0.74), h = Math.round(w*74/140); return {w, h, dx:5, dy:6}; }
+    const s = Math.round(d.d*2.25); return {w:s, h:s, dx:0, dy:8};
+  }
+  function renderStacks(animKey){
+    const counts = {}; for (const k of allItems()) counts[k] = (counts[k]||0)+1;
+    noteStacks.innerHTML = ""; coinStacks.innerHTML = "";
+    let animEl = null;
+    for (const k of KEYS){
+      const n = counts[k]; if (!n) continue;
+      // Mehr als 10 Stapel einer Sorte: Stapel fassen dann 50 Stück und liegen enger
+      const big = n > MAX_VIS*10, cap = big ? 50 : MAX_VIS;
+      const g0 = geometry(k), g = big ? {...g0, dx: g0.dx ? 1.5 : 0, dy: DENOMS[k].t==="note" ? 2 : 2.4} : g0;
+      const stack = document.createElement("div"); stack.className = "stack";
+      const piles = document.createElement("div"); piles.className = "piles";
+      // Je 10 Stück ein eigener Stapel
+      for (let start=0; start<n; start+=cap){
+        const vis = Math.min(cap, n-start);
+        const pile = document.createElement("div"); pile.className = "pile";
+        pile.style.width = (g.w + g.dx*(vis-1))+"px";
+        pile.style.height = (g.h + g.dy*(vis-1))+"px";
+        for (let i=0;i<vis;i++){
+          const holder = document.createElement("div"); holder.innerHTML = art(k);
+          const svg = holder.firstElementChild;
+          svg.setAttribute("width", g.w); svg.setAttribute("height", g.h);
+          svg.style.left = (i*g.dx)+"px"; svg.style.top = (i*g.dy)+"px";
+          pile.appendChild(svg);
+          if (k===animKey && start+i===n-1) animEl = svg;
+        }
+        piles.appendChild(pile);
+      }
+      const cnt = document.createElement("div"); cnt.className = "count";
+      cnt.textContent = n+" × "+label(k);
+      stack.setAttribute("aria-label", n+" mal "+label(k));
+      stack.append(piles, cnt);
+      (DENOMS[k].t==="note" ? noteStacks : coinStacks).appendChild(stack);
+    }
+    elEmpty.style.display = allItems().length ? "none" : "";
+    fitStage();
+    if (animEl && animEl.animate){
+      if (reduced) animEl.animate([{opacity:0},{opacity:1}],{duration:150});
+      else animEl.animate([
+        {transform:"translateY(-70px) rotate(-8deg)", opacity:0},
+        {transform:"translateY(3px) rotate(1deg)", opacity:1, offset:.7},
+        {transform:"translateY(0) rotate(0)"}
+      ],{duration:420, easing:"cubic-bezier(.3,.7,.4,1)"});
+    }
+  }
+  // Stapel so verkleinern, dass alles ohne Scrollen in den freien Platz passt
+  function fitStage(){
+    const stage = $("stage"), inner = $("stageInner");
+    if (stage.hidden) return;
+    const W = stage.clientWidth, H = stage.clientHeight;
+    if (!W || !H) return;
+    // Größten Maßstab suchen, bei dem alles passt (kleiner Maßstab = mehr Platz zum Umbrechen)
+    let sc = 1;
+    for (; sc > 0.12; sc -= 0.02){
+      inner.style.width = (W/sc)+"px";
+      if (inner.offsetHeight*sc <= H && inner.scrollWidth*sc <= W+1) break;
+    }
+    inner.style.width = (W/sc)+"px";
+    inner.style.transform = "translate(-50%,-50%) scale("+sc+")";
+  }
+  function bumpTotal(){
+    if (reduced || !elTotal.animate) return;
+    elTotal.animate([{transform:"scale(1)"},{transform:"scale(1.05)"},{transform:"scale(1)"}],{duration:260, easing:"ease-out"});
+  }
+
+  // ---------- Glas-Ansicht (Physik) ----------
+  const cv = $("glass"), gx = cv.getContext("2d");
+  const IMG = {};
+  for (const k of KEYS){
+    const sized = DENOMS[k].t==="note" ? art(k).replace("<svg ", '<svg width="420" height="222" ') : art(k).replace("<svg ", '<svg width="240" height="240" ');
+    const im = new Image(); im.onload = () => { if (tab==="glas") gdraw(); };
+    im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(sized); IMG[k] = im;
+  }
+  let GW=360, GH=440, gdpr=1, X0=0, X1=0, Y0=0, Y1=0, CR=30, S=1, gitems=[], pourTimers=[];
+  let gcol = {};
+  function gcolors(){ const cs = getComputedStyle(document.documentElement);
+    gcol = {glass:cs.getPropertyValue("--glass").trim(), fill:cs.getPropertyValue("--glass-fill").trim(), muted:cs.getPropertyValue("--muted").trim()}; }
+  function glayout(){
+    const w = Math.min(cv.parentElement.clientWidth || 360, 480);
+    GW = w; GH = Math.max(150, cv.parentElement.clientHeight || 380);
+    gdpr = Math.min(window.devicePixelRatio||1, 3);
+    cv.width = Math.round(GW*gdpr); cv.height = Math.round(GH*gdpr);
+    gx.setTransform(gdpr,0,0,gdpr,0,0);
+    const gw = Math.min(w*0.52, 210, (GH-34)*0.75);
+    X0 = Math.round((GW-gw)/2); X1 = X0+gw; Y0 = 24; Y1 = GH-10; CR = 30; S = gw/110;
+  }
+  function gbase(k){
+    const d = DENOMS[k];
+    if (d.t==="coin") return {r:d.d/2*S};
+    const w = d.w*S*0.42, h = d.h*S*0.42; return {w, h, r:h*0.62};
+  }
+  function gsizes(){
+    let area = 0;
+    for (const it of gitems){ const b = gbase(it.k); area += b.w ? b.w*b.h*0.8 : Math.PI*b.r*b.r; }
+    const cap = (X1-X0)*(Y1-Y0-70)*0.62;
+    const f = area > cap ? Math.sqrt(cap/area) : 1;
+    for (const it of gitems){ const b = gbase(it.k); it.r = b.r*f; if (b.w){ it.w = b.w*f; it.h = b.h*f; } }
+  }
+  function gmake(k){ return {k, x:0, y:0, vx:0, vy:0, va:0, a:(Math.random()-.5)*(DENOMS[k].t==="note"?1.0:6.28)}; }
+  function gdropPos(it){
+    const span = (X1-X0)*0.28;
+    it.x = (X0+X1)/2 + (Math.random()-.5)*span; it.y = -(it.r||20) - 10;
+    it.vx = (Math.random()-.5)*40; it.vy = 80;
+    if (DENOMS[it.k].t==="note") it.va = (Math.random()-.5)*4;
+  }
+  function gRebuild(pour){
+    pourTimers.forEach(clearTimeout); pourTimers = [];
+    const all = Object.keys(state.days).sort().flatMap(d=>state.days[d]).filter(k=>DENOMS[k]);
+    const keys = all.length <= 220 ? all : greedy(totalCents()).slice(0,220);
+    const nPour = pour && !reduced ? Math.min(keys.length, 36) : 0;
+    const settled = keys.slice(0, keys.length-nPour), poured = keys.slice(keys.length-nPour);
+    gitems = settled.map(gmake);
+    gsizes();
+    for (const it of gitems){ it.x = X0+it.r + Math.random()*Math.max(1,(X1-X0-2*it.r)); it.y = Y0+80 + Math.random()*Math.max(1,(Y1-Y0-80-it.r)); }
+    for (let i=0;i<360;i++) gstep(1/60);
+    for (const it of gitems){ it.vx = it.vy = it.va = 0; }
+    gdraw();
+    const gap = nPour ? Math.min(90, 1300/nPour) : 0;
+    poured.forEach((k,i) => pourTimers.push(setTimeout(() => gspawn(k), 150 + i*gap)));
+  }
+  function gspawn(k){
+    const it = gmake(k); gitems.push(it);
+    if (gitems.length > 260){ gRebuild(false); return; }
+    gsizes(); gdropPos(it); gwake();
+  }
+  function gremove(k){
+    for (let i=gitems.length-1;i>=0;i--){ if (gitems[i].k===k){ gitems.splice(i,1); break; } }
+    gsizes(); gwake();
+  }
+  const G = 1500;
+  function gstep(dt){
+    const n = gitems.length;
+    for (const it of gitems){
+      it.vy += G*dt; it.x += it.vx*dt; it.y += it.vy*dt; it.a += it.va*dt; it.va *= 0.96; it.vx *= 0.995;
+      const r = it.r;
+      if (it.x < X0+r){ it.x = X0+r; if (it.vx<0) it.vx = -it.vx*0.3; it.va *= .8; }
+      if (it.x > X1-r){ it.x = X1-r; if (it.vx>0) it.vx = -it.vx*0.3; it.va *= .8; }
+      if (it.y > Y1-r){ it.y = Y1-r; if (it.vy>0){ it.vy = -it.vy*0.25; it.vx *= 0.85; it.va *= 0.7; } }
+      const lim = CR - r;
+      if (lim > 0 && it.y > Y1-CR){
+        const side = it.x < X0+CR ? X0+CR : it.x > X1-CR ? X1-CR : null;
+        if (side !== null){
+          const dx = it.x-side, dy = it.y-(Y1-CR), d = Math.hypot(dx,dy);
+          if (d > lim){ const nx=dx/d, ny=dy/d; it.x = side+nx*lim; it.y = Y1-CR+ny*lim;
+            const vn = it.vx*nx+it.vy*ny; if (vn>0){ it.vx -= 1.3*vn*nx; it.vy -= 1.3*vn*ny; } }
+        }
+      }
+    }
+    for (let pass=0; pass<3; pass++){
+      for (let i=0;i<n;i++){ const A=gitems[i];
+        for (let j=i+1;j<n;j++){ const B=gitems[j];
+          const dx=B.x-A.x, dy=B.y-A.y, rs=A.r+B.r;
+          if (dx>rs||dx<-rs||dy>rs||dy<-rs) continue;
+          const d2=dx*dx+dy*dy; if (d2>=rs*rs || d2===0) continue;
+          const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, o=(rs-d)*0.5;
+          A.x-=nx*o; A.y-=ny*o; B.x+=nx*o; B.y+=ny*o;
+          const rv=(B.vx-A.vx)*nx+(B.vy-A.vy)*ny;
+          if (rv<0){ const jv=-(1.2*rv)/2; A.vx-=jv*nx; A.vy-=jv*ny; B.vx+=jv*nx; B.vy+=jv*ny; A.vx*=.97; B.vx*=.97; A.va*=.8; B.va*=.8; }
+        }
+      }
+    }
+  }
+  function glassPath(top, close){
+    gx.beginPath(); gx.moveTo(X0, top); gx.lineTo(X0, Y1-CR); gx.arcTo(X0, Y1, X0+CR, Y1, CR);
+    gx.lineTo(X1-CR, Y1); gx.arcTo(X1, Y1, X1, Y1-CR, CR); gx.lineTo(X1, top); if (close) gx.closePath();
+  }
+  function gdraw(){
+    gx.clearRect(0,0,GW,GH);
+    glassPath(Y0, true); gx.fillStyle = gcol.fill; gx.fill();
+    gx.save(); glassPath(0, true); gx.clip();
+    for (const it of gitems){
+      const im = IMG[it.k]; if (!im.complete) continue;
+      gx.save(); gx.translate(it.x, it.y); gx.rotate(it.a);
+      if (it.w) gx.drawImage(im, -it.w/2, -it.h/2, it.w, it.h);
+      else gx.drawImage(im, -it.r, -it.r, it.r*2, it.r*2);
+      gx.restore();
+    }
+    gx.restore();
+    // Glaswand
+    gx.lineJoin = "round"; gx.lineCap = "round";
+    glassPath(Y0, false); gx.strokeStyle = gcol.glass; gx.lineWidth = 5; gx.stroke();
+    gx.beginPath(); gx.moveTo(X0-7, Y0); gx.lineTo(X0+3, Y0); gx.moveTo(X1-3, Y0); gx.lineTo(X1+7, Y0); gx.lineWidth = 6; gx.stroke();
+    // Glanz
+    gx.strokeStyle = "rgba(255,255,255,.5)"; gx.lineWidth = 6;
+    gx.beginPath(); gx.moveTo(X0+14, Y0+30); gx.lineTo(X0+14, Y1-CR-10); gx.stroke();
+    gx.lineWidth = 3; gx.beginPath(); gx.moveTo(X1-12, Y0+40); gx.lineTo(X1-12, Y0+110); gx.stroke();
+    // Skala
+    gx.strokeStyle = gcol.glass; gx.lineWidth = 2;
+    for (let i=1;i<=8;i++){ const y = Y1 - i*(Y1-Y0)/9; gx.beginPath(); gx.moveTo(X1+12, y); gx.lineTo(X1+(i%2?20:26), y); gx.stroke(); }
+    if (!gitems.length){
+      gx.fillStyle = gcol.muted; gx.textAlign = "center"; gx.textBaseline = "middle";
+      gx.font = '600 15px "Bricolage Grotesque", system-ui, sans-serif';
+      gx.fillText("Noch leer", (X0+X1)/2, Y1-60);
+    }
+  }
+  let grunning = false, glast = 0, gacc = 0, gcalm = 0;
+  function gwake(){ if (!grunning && tab==="glas"){ grunning = true; glast = performance.now(); gacc = 0; gcalm = 0; requestAnimationFrame(gloop); } }
+  function gloop(t){
+    if (tab !== "glas"){ grunning = false; return; }
+    gacc += Math.min(0.05, (t-glast)/1000); glast = t;
+    while (gacc >= 1/120){ gstep(1/120); gacc -= 1/120; }
+    gdraw();
+    let moving = pourTimers.length && gitems.some(it => it.y < Y0);
+    if (!moving) for (const it of gitems){ if (Math.abs(it.vx)+Math.abs(it.vy) > 18 || Math.abs(it.va) > .05){ moving = true; break; } }
+    gcalm = moving ? 0 : gcalm+1;
+    if (gcalm > 30){ grunning = false; return; }
+    requestAnimationFrame(gloop);
+  }
+
+  // ---------- Reiter ----------
+  let tab = "stapel";
+  try{ const t = localStorage.getItem("sparschwein:tab"); if (t === "glas" || t === "zinsen") tab = t; }catch(e){}
+  function showTab(t){
+    tab = t;
+    try{ localStorage.setItem("sparschwein:tab", t); }catch(e){}
+    for (const name of ["stapel","glas","zinsen"]) $("tab-"+name).setAttribute("aria-selected", String(name===t));
+    $("stage").hidden = t !== "stapel"; $("glassWrap").hidden = t !== "glas"; $("calc").hidden = t !== "zinsen";
+    for (const id of ["totalSec","traySec","footSec"]) $(id).hidden = t === "zinsen";
+    if (t === "glas"){ gcolors(); glayout(); gRebuild(true); gwake(); }
+    else { pourTimers.forEach(clearTimeout); pourTimers = []; }
+    if (t === "stapel") renderStacks();
+    if (t === "zinsen") calcOpen();
+  }
+  $("tab-stapel").addEventListener("click", () => tab!=="stapel" && showTab("stapel"));
+  $("tab-glas").addEventListener("click", () => tab!=="glas" && showTab("glas"));
+  $("tab-zinsen").addEventListener("click", () => tab!=="zinsen" && showTab("zinsen"));
+  window.addEventListener("resize", () => { if (tab==="glas"){ glayout(); gRebuild(false); } else if (tab==="stapel") fitStage(); });
+  try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { gcolors(); if (tab==="glas") gdraw(); }); }catch(e){}
+
+  // Tipp-Leiste
+  for (const k of [...KEYS].reverse()){
+    const d = DENOMS[k], b = document.createElement("button");
+    b.className = "money"; b.innerHTML = art(k);
+    b.setAttribute("aria-label", label(k)+" hinzufügen");
+    if (d.t==="coin"){ const s = Math.round(d.d*2.0); b.style.width = s+"px"; $("coins").appendChild(b); }
+    else { $("notes").appendChild(b); }
+    b.addEventListener("click", () => deposit([k]));
+  }
+
+  // ---------- Speichern (Claude-Konto, sonst Gerät) ----------
+  let dbRef = null, writing = false, dirty = false, saveTimer = null, dbChecked = false;
+  const setStatus = t => { elStatus.textContent = t; };
+  function scheduleSave(){
+    state.u = Date.now(); lsSave();
+    if (!dbRef){ setStatus(dbChecked ? "Nur auf diesem Gerät" : "Gespeichert"); return; }
+    dirty = true; setStatus("Wird gespeichert …");
+    clearTimeout(saveTimer); saveTimer = setTimeout(flush, 600);
+  }
+  async function flush(){
+    if (writing || !dirty || !dbRef) return;
+    writing = true; dirty = false;
+    try{ await dbRef.set(JSON.parse(JSON.stringify(state))); setStatus("Gespeichert"); }
+    catch(e){
+      if (e && e.code === "unavailable"){ dirty = true; setTimeout(flush, 1500 + Math.random()*1000); }
+      else { setStatus("Nur auf diesem Gerät"); dbRef = null; }
+    }
+    writing = false;
+    if (dirty) flush();
+  }
+  async function connect(){
+    try{
+      if (!window.claude || !window.claude.use){ dbChecked = true; setStatus("Nur auf diesem Gerät"); return; }
+      const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+      const id = user ? await user.id() : null;
+      dbChecked = true;
+      if (!db || !id){ setStatus("Nur auf diesem Gerät"); return; }
+      const ref = db.doc("data/users/"+id+"/sparschwein");
+      const snap = await ref.get();
+      dbRef = ref;
+      const remote = snap.exists ? snap.data() : null;
+      if (valid(remote) && (remote.u||0) >= (state.u||0)){
+        state = JSON.parse(JSON.stringify(remote));
+        lsSave(); renderNumbers(); if (tab==="glas") gRebuild(false); else renderStacks();
+        setStatus("Gespeichert");
+      } else if (Object.keys(state.days).length){ dirty = true; flush(); }
+      else setStatus("Gespeichert");
+    }catch(e){ dbChecked = true; setStatus("Nur auf diesem Gerät"); }
+  }
+
+  // ---------- Aktionen ----------
+  function greedy(c){ const out=[]; for (const k of KEYS){ while (c >= DENOMS[k].v){ out.push(k); c -= DENOMS[k].v; } } return out; }
+  function deposit(keys){
+    if (!keys.length) return;
+    const dk = dayKey();
+    // Bei vielen Stücken in höchstens 20 Schüben, damit es nicht ewig dauert
+    const steps = Math.min(keys.length, 20), size = Math.ceil(keys.length/steps);
+    const gap = keys.length <= 20 ? 150 : 80;
+    for (let i=0, s=0; i<keys.length; i+=size, s++){
+      const chunk = keys.slice(i, i+size), last = i+size >= keys.length;
+      setTimeout(() => {
+        state.days[dk] = (state.days[dk] || []).concat(chunk);
+        renderNumbers();
+        if (tab==="glas") chunk.forEach(gspawn); else renderStacks(chunk[chunk.length-1]);
+        bumpTotal();
+        if (last) scheduleSave();
+      }, s*gap);
+    }
+  }
+  // "3,70", "50 ct", "1 €", "2 euro" -> Cent; ohne Einheit gilt Euro
+  function parseMoney(str){
+    let t = str.toLowerCase().replace(/\s/g,"");
+    let unit = 100;
+    const mc = t.match(/^(.*?)(cents?|ct|c)$/);
+    if (mc){ t = mc[1]; unit = 1; } else t = t.replace(/(€|euros?|eur)$/,"");
+    if (!t) return NaN;
+    t = t.replace(/\./g,"").replace(",",".");
+    if (!/^\d*\.?\d+$/.test(t)) return NaN;
+    return Math.round(parseFloat(t)*unit);
+  }
+  const DENOM_HINT = "1, 2, 5, 10, 20, 50 ct oder 1, 2, 5, 10, 20, 50, 100 €";
+  $("drop").addEventListener("click", () => {
+    const input = $("amount").value.trim();
+    // "1 € in 1 ct", "1 euro in nur 1ct stücken"
+    const parts = input.split(/\s+in\s+/i);
+    const cents = parseMoney(parts[0]);
+    if (!input || !isFinite(cents) || cents <= 0){ elMsg.textContent = "Gib einen Betrag über 0 ein, z. B. 3,70 oder 1 € in 1 ct."; return; }
+    if (cents > 1000000){ elMsg.textContent = "Bitte höchstens 10.000 € auf einmal."; return; }
+    let keys;
+    if (parts.length === 2){
+      const dc = parseMoney(parts[1].toLowerCase().replace(/\b(nur|je|lauter)\b|(stück|münze|schein)\w*|-/g,""));
+      const k = KEYS.find(k => DENOMS[k].v === dc);
+      if (!k){ elMsg.textContent = "Diese Stückelung gibt es nicht. Möglich: "+DENOM_HINT+"."; return; }
+      const n = Math.floor(cents/DENOMS[k].v);
+      if (n > 1000){ elMsg.textContent = "Höchstens 1.000 Stück auf einmal, z. B. 10 € in 1 ct."; return; }
+      // Was nicht aufgeht, wird automatisch gestückelt
+      keys = Array(n).fill(k).concat(greedy(cents - n*DENOMS[k].v));
+    } else if (parts.length === 1){
+      keys = greedy(cents);
+    } else { elMsg.textContent = "Schreib es so: 1 € in 1 ct."; return; }
+    elMsg.textContent = ""; $("amount").value = "";
+    deposit(keys);
+  });
+  $("amount").addEventListener("keydown", e => { if (e.key==="Enter") $("drop").click(); });
+  $("amount").addEventListener("input", () => { elMsg.textContent = ""; });
+  // Alles löschen: erster Klick fragt nach, zweiter Klick löscht
+  const elClear = $("clear"); let clearArmed = null;
+  function disarmClear(){ clearTimeout(clearArmed); clearArmed = null; elClear.textContent = "Alles löschen"; elClear.classList.remove("danger"); }
+  elClear.addEventListener("click", () => {
+    if (!clearArmed){
+      elClear.textContent = "Wirklich löschen?"; elClear.classList.add("danger");
+      clearArmed = setTimeout(disarmClear, 3000); return;
+    }
+    disarmClear();
+    state.days = {};
+    renderNumbers(); if (tab==="glas") gRebuild(false); else renderStacks(); scheduleSave();
+  });
+  elUndo.addEventListener("click", () => {
+    const dk = dayKey(), list = state.days[dk];
+    if (!list || !list.length) return;
+    const k = list.pop(); if (!list.length) delete state.days[dk];
+    renderNumbers(); if (tab==="glas") gremove(k); else renderStacks(); scheduleSave();
+  });
+
+  // ---------- Zinsrechner ----------
+  const cAmount = $("cAmount"), cRate = $("cRate");
+  const cOut = {year:$("cYear"), month:$("cMonth"), day:$("cDay")};
+  const fmtFine = new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR",minimumFractionDigits:4,maximumFractionDigits:4});
+  const fmtPlain = new Intl.NumberFormat("de-DE",{maximumFractionDigits:2});
+  // Akzeptiert "10.000,50", "10000,5", "10000.5" und "1.000.000"
+  function parseAmount(v){
+    v = String(v).replace(/[\s€]/g,""); if (!v) return NaN;
+    if (v.indexOf(",") !== -1) v = v.replace(/\./g,"").replace(",",".");
+    else if (/^\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g,"");
+    return /^-?\d*\.?\d+$/.test(v) ? parseFloat(v) : NaN;
+  }
+  function parseRate(v){
+    v = String(v).replace(/[\s%]/g,"").replace(",",".");
+    return /^-?\d*\.?\d+$/.test(v) ? parseFloat(v) : NaN;
+  }
+  let cShown = {year:0, month:0, day:0}, cTarget = {year:0, month:0, day:0}, cRaf = null;
+  function cRender(v){
+    cOut.year.textContent = fmt.format(v.year);
+    cOut.month.textContent = fmt.format(v.month);
+    // Cent normal, 3. und 4. Nachkommastelle klein und grau
+    cOut.day.innerHTML = fmtFine.formatToParts(v.day).map(p =>
+      p.type === "fraction" ? p.value.slice(0,2)+'<span class="fine">'+p.value.slice(2)+'</span>'
+                            : p.value.replace(/&/g,"&amp;").replace(/</g,"&lt;")).join("");
+  }
+  function cAnim(){
+    let done = true;
+    for (const k in cTarget){
+      const d = cTarget[k]-cShown[k];
+      if (Math.abs(d) < 0.00005) cShown[k] = cTarget[k]; else { cShown[k] += d*0.22; done = false; }
+    }
+    cRender(cShown); cRaf = done ? null : requestAnimationFrame(cAnim);
+  }
+  function calcUpdate(){
+    let a = parseAmount(cAmount.value), r = parseRate(cRate.value);
+    if (isNaN(a)) a = 0; if (isNaN(r)) r = 0;
+    const y = a*r/100;
+    cTarget = {year:y, month:y/12, day:y/365};
+    try{ localStorage.setItem("sparschwein:zins", JSON.stringify({a:cAmount.value, r:cRate.value})); }catch(e){}
+    if (reduced || tab !== "zinsen"){ cShown = {...cTarget}; cRender(cShown); return; }
+    if (!cRaf) cRaf = requestAnimationFrame(cAnim);
+  }
+  let calcReady = false;
+  function calcOpen(){
+    if (!calcReady){
+      calcReady = true;
+      let saved = null; try{ saved = JSON.parse(localStorage.getItem("sparschwein:zins")); }catch(e){}
+      if (saved && typeof saved === "object"){ cAmount.value = saved.a || ""; cRate.value = saved.r || ""; }
+      else { const t = totalCents(); cAmount.value = fmtPlain.format(t > 0 ? t/100 : 1000); cRate.value = "2,5"; }
+    }
+    calcUpdate();
+  }
+  cAmount.addEventListener("input", calcUpdate);
+  cRate.addEventListener("input", calcUpdate);
+  cAmount.addEventListener("blur", () => { const a = parseAmount(cAmount.value); if (!isNaN(a)) cAmount.value = fmtPlain.format(a); });
+  cRate.addEventListener("blur", () => { const r = parseRate(cRate.value); if (!isNaN(r)) cRate.value = fmtPlain.format(r); });
+  for (const el of [cAmount, cRate]) el.addEventListener("focus", () => el.select());
+
+  // ---------- Start ----------
+  const local = lsLoad(); if (valid(local)) state = local;
+  renderNumbers(); showTab(tab); setStatus("Gespeichert");
+  connect();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) renderNumbers(); });
+})();
+</script>
+</body>
+</html>
